@@ -17,6 +17,8 @@ setfreq em64
 #define TABLE_SCORES 151
 #define TRUE 1
 #define FALSE 0
+#define MIN_SCORE -64
+#define MAX_SCORE 64
 
 symbol opiece = b0
 symbol piece = b1
@@ -119,7 +121,7 @@ start:
          level = 0
          side = 0x08 ; user move
          gosub _play
-         if best_score!=64 then
+         if best_score!=MAX_SCORE then
             ; move not found
             gosub notvalid
             exit
@@ -136,7 +138,7 @@ start:
          ; computer moves to validate if user in check
          side = 0
          gosub _play
-         if best_score=64 then
+         if best_score=MAX_SCORE then
             sertxd("In check!\r\n")
             origin = saved_origin
             target = saved_target
@@ -241,8 +243,8 @@ return
 
    
 _play:
-   validmove = 0
-   best_score = -64
+   validmove = FALSE
+   best_score = MIN_SCORE
    ; scan the board
    for origin=21 to 98
       ; progress
@@ -290,7 +292,7 @@ _play:
                if temp<7 then exit
                if check_king_attack=TRUE then
                   if temp=14 then
-                     best_score = 64
+                     best_score = MAX_SCORE
                      return
                   endif
                endif
@@ -299,7 +301,7 @@ _play:
                if check_king_attack=FALSE then
                   ; do user move validation
                   if saved_origin=origin and saved_target=target then
-                     best_score = 64
+                     best_score = MAX_SCORE
                      return
                   endif
                endif
@@ -311,7 +313,7 @@ _play:
                gosub _play
                temp = best_score
                popram
-               if temp=64 then
+               if temp=MAX_SCORE then
                   gosub undo_move
                else
                   validmove = TRUE
@@ -371,7 +373,7 @@ _play:
       loop while directions>0
    next_origin:
    next origin
-   if level!=0 and validmove=0 then
+   if level!=0 and validmove=FALSE then
       ; no valid moves found, check for checkmate
       pushram
       level = 0
@@ -379,8 +381,8 @@ _play:
       gosub _play
       temp = best_score
       popram
-      if temp=64 then
-         best_score = TOP_LEVEL-level-64
+      if temp=MAX_SCORE then
+         best_score = TOP_LEVEL-level-MAX_SCORE
       else
          best_score = 0;
       endif
