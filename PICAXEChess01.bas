@@ -19,57 +19,50 @@
 
 #picaxe 28x2
 setfreq em64
-;setfreq m16
 
-; move generation
-; search best move
-; validate user moves
-; test for check
-; test for checkmate
-; test for stalemate
-
-#define TOP_LEVEL 3
-#define BOARD 0
-#define TABLE_BOARD_INIT 0
-#define TABLE_OFFSET 120
+#define TOP_LEVEL           3
+#define BOARD               0
+#define TABLE_BOARD_INIT    0
+#define TABLE_OFFSET        120
 #define TABLE_DISPLACEMENTS 127
-#define TABLE_SCORES 151
-#define TRUE 1
-#define FALSE 0
-#define MIN_SCORE -64
-#define MAX_SCORE 64
+#define TABLE_SCORES        151
+#define TRUE                1
+#define FALSE               0
+#define MIN_SCORE           -64
+#define MAX_SCORE           64
 
-symbol opiece = b0
-symbol piece = b1
-symbol origin = b2
-symbol target = b3
-symbol offset = b4
-symbol displacement = b5
-symbol directions = b6
-symbol capture = b7
-symbol score = b8
-symbol best_score = b9
-symbol side = b10
-symbol level = b11
-symbol validmove = b12
-symbol s2 = b13
-symbol bs2 = b14
+symbol opiece            = b0
+symbol piece             = b1
+symbol origin            = b2
+symbol target            = b3
+symbol offset            = b4
+symbol displacement      = b5
+symbol directions        = b6
+symbol capture           = b7
+symbol score             = b8
+symbol best_score        = b9
+symbol side              = b10
+symbol level             = b11
+symbol validmove         = b12
+symbol s2                = b13
+symbol bs2               = b14
 
-symbol i = b16
-symbol sign = b17
-symbol temp = b18
-symbol p = b19
-symbol row = b20
-symbol col = b21
+symbol i                 = b16
+symbol sign              = b17
+symbol temp              = b18
+symbol p                 = b19
+symbol row               = b20
+symbol col               = b21
 symbol check_king_attack = b22
-symbol best_origin = b23
-symbol best_target = b24
-symbol saved_origin = b25
-symbol saved_target = b26
-symbol saved_opiece = b27
-symbol saved_capture = b28
-symbol n = b29
-symbol rand = w15 ; b30, b31
+symbol best_origin       = b23
+symbol best_target       = b24
+symbol saved_origin      = b25
+symbol saved_target      = b26
+symbol saved_opiece      = b27
+symbol saved_capture     = b28
+symbol n                 = b29
+symbol rand              = w15 ; b30, b31
+symbol opening           = b32
 
 ; initial setup (0)
 table (7, 7, 7, 7, 7, 7, 7, 7, 7, 7) ; 0
@@ -105,21 +98,14 @@ table (0x09,0x0b,0x0a,0x14) ; black pawn, capture left, capture right, forward o
 ; piece scores (151)
 table (0,1,5,3,9,3,45)
 
-#rem
-for i=0 to 10 : do
-   if i=2 or i=3 then : exit : endif
-   sertxd(#i)
-   sertxd(0x0d)
-exit : loop : next i
-end
-#endrem
-
 start:
    gosub init
+   gosub show_board
    do
       ; double loop so we can use exit to continue!
       do
-         gosub show_board
+         origin = 0
+         target = 0
          gosub read_coord
          get origin,opiece
          p = opiece&0x08
@@ -168,17 +154,70 @@ start:
          endif
          ; user move is valid
          gosub show_board
+         
          ; computer move
-         check_king_attack = TRUE
-         level = TOP_LEVEL
-         side = 0 ; black to play
-         n = 1 ; number of moves with same score
-         gosub _play
-         sertxd("Move score: ",#best_score,"\r\n")
+         if opening=TRUE then
+            opening = FALSE;
+            if origin=92 or origin=97 or origin=84 then
+               best_origin = 34
+               best_target = 54
+            else
+               best_origin = 35
+               best_target = 55
+            endif
+         else
+            best_origin=0
+            best_target=0
+            check_king_attack = TRUE
+            level = TOP_LEVEL
+            side = 0 ; black to play
+            n = 1 ; number of moves with same score
+            gosub _play
+            sertxd("Move score: ",#best_score,"\r\n")
+            if best_origin=0 then
+               ; no move found, checkmate or stalemate
+               if best_score=0 then
+                  sertxd("Stalemate, draw.\r\n")
+               else
+                  sertxd("Checkmate, you win!\r\n")
+               endif
+               reset
+            endif
+         endif
+       
          get best_origin,opiece
          origin = best_origin
          target = best_target
          gosub do_move
+         gosub show_board
+
+         ; output move coords
+         temp = origin
+         gosub print_coord
+         sertxd(",");
+         temp = target
+         gosub print_coord
+
+         ; try user moves to check for checkmate, stalemate
+         level = 1;
+         side = 0x08;
+         gosub _play
+         if validmove=FALSE then
+            if best_score=0 then
+               sertxd(": stalemate.\r\n")
+            else
+               sertxd(": checkmate!\r\n")
+            endif
+            reset
+         endif
+         ; do computer moves to test for player in check
+         level = 0
+         side = 0
+         gosub _play
+         if best_score=64 then
+            sertxd(": check!")
+         endif
+         sertxd("\r\n")
       loop
    loop
 end
@@ -201,12 +240,38 @@ read_coord:
    target = 9-temp*10+target
 return
 
+print_coord:
+   if temp!=0 then
+      col = temp % 10
+      col = col-1+0x61
+      row = temp/10
+      row = 10-row+0x30
+      sertxd(col,row)
+   endif
+return
+
 init:
+   sertxd("\r\n")
+   sertxd("\r\n")
+   sertxd("*************************\r\n")
+   sertxd("*************************\r\n")
+   sertxd("***                   ***\r\n")
+   sertxd("***                   ***\r\n")
+   sertxd("***                   ***\r\n")
+   sertxd("*** PICAXE Chess v.01 ***\r\n")
+   sertxd("***                   ***\r\n")
+   sertxd("***                   ***\r\n")
+   sertxd("***                   ***\r\n")
+   sertxd("*************************\r\n")
+   sertxd("*************************\r\n")
+   sertxd("\r\n")
+   sertxd("\r\n")
    pushram clear
    pushram clear
    pushram clear
    pushram clear
    pushram clear
+   opening = TRUE;
    for i=0 to 119
       readtable i,temp
       put i,temp
@@ -261,6 +326,13 @@ undo_move:
 return
 
    
+; move generation
+; search best move
+; validate user moves
+; test for check
+; test for checkmate
+; test for stalemate
+
 _play:
    validmove = FALSE
    best_score = MIN_SCORE
@@ -360,9 +432,9 @@ _play:
                   if temp!=0 and temp<0x80 or sign>=0x80 then
                      best_score = score
                      if level=TOP_LEVEL then
+                        ; output best so far
                         best_origin = origin
                         best_target = target
-                        ; //// output best so far
                      else
                         sign = s2-best_score
                         temp = bs2-sign
@@ -371,15 +443,15 @@ _play:
                            return
                         endif
                      endif
-                  elseif temp=0 and level=TOP_LEVEL then
+                  elseif level=TOP_LEVEL and temp=0 then
                      ; select a random move
                      inc n
                      random rand
                      temp = rand%n
                      if temp=0 then
+                        ; output best so far
                         best_origin = origin
                         best_target = target
-                        ; //// output best so far
                      endif
                   endif
                endif
